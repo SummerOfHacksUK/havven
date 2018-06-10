@@ -55,7 +55,6 @@ contract FeeToken is ExternStateToken {
 
     /**
      * @dev Constructor.
-     * @param _proxy The proxy associated with this contract.
      * @param _name Token's ERC20 name.
      * @param _symbol Token's ERC20 symbol.
      * @param _totalSupply The total supply of the token.
@@ -63,9 +62,9 @@ contract FeeToken is ExternStateToken {
      * @param _feeAuthority The address which has the authority to withdraw fees from the accumulated pool.
      * @param _owner The owner of this contract.
      */
-    constructor(address _proxy, string _name, string _symbol, uint _totalSupply,
+    constructor(string _name, string _symbol, uint _totalSupply,
                 uint _transferFeeRate, address _feeAuthority, address _owner)
-        ExternStateToken(_proxy, _name, _symbol, _totalSupply,
+        ExternStateToken(_name, _symbol, _totalSupply,
                          new TokenState(_owner, address(this)),
                          _owner)
         public
@@ -85,11 +84,10 @@ contract FeeToken is ExternStateToken {
      */
     function setTransferFeeRate(uint _transferFeeRate)
         external
-        optionalProxy_onlyOwner
     {
         require(_transferFeeRate <= MAX_TRANSFER_FEE_RATE);
         transferFeeRate = _transferFeeRate;
-        emitTransferFeeRateUpdated(_transferFeeRate);
+        emit TransferFeeRateUpdated(_transferFeeRate);
     }
 
     /**
@@ -98,10 +96,9 @@ contract FeeToken is ExternStateToken {
      */
     function setFeeAuthority(address _feeAuthority)
         public
-        optionalProxy_onlyOwner
     {
         feeAuthority = _feeAuthority;
-        emitFeeAuthorityUpdated(_feeAuthority);
+        emit FeeAuthorityUpdated(_feeAuthority);
     }
 
     /* ========== VIEWS ========== */
@@ -173,7 +170,6 @@ contract FeeToken is ExternStateToken {
         /* Disallow transfers to irretrievable-addresses. */
         require(to != address(0));
         require(to != address(this));
-        require(to != address(proxy));
 
         /* Insufficient balance will be handled by the safe subtraction. */
         tokenState.setBalanceOf(from, safeSub(tokenState.balanceOf(from), safeAdd(amount, fee)));
@@ -181,8 +177,8 @@ contract FeeToken is ExternStateToken {
         tokenState.setBalanceOf(address(this), safeAdd(tokenState.balanceOf(address(this)), fee));
 
         /* Emit events for both the transfer itself and the fee. */
-        emitTransfer(from, to, amount);
-        emitTransfer(from, address(this), fee);
+        emit Transfer(from, to, amount);
+        emit Transfer(from, address(this), fee);
 
         return true;
     }
@@ -190,7 +186,7 @@ contract FeeToken is ExternStateToken {
     /**
      * @notice ERC20 friendly transfer function.
      */
-    function _transfer_byProxy(address sender, address to, uint value)
+    function _transfer(address sender, address to, uint value)
         internal
         returns (bool)
     {
@@ -203,7 +199,7 @@ contract FeeToken is ExternStateToken {
     /**
      * @notice ERC20 friendly transferFrom function.
      */
-    function _transferFrom_byProxy(address sender, address from, address to, uint value)
+    function _transferFrom(address sender, address from, address to, uint value)
         internal
         returns (bool)
     {
@@ -221,7 +217,7 @@ contract FeeToken is ExternStateToken {
     /**
      * @notice Ability to transfer where the sender pays the fees (not ERC20)
      */
-    function _transferSenderPaysFee_byProxy(address sender, address to, uint value)
+    function _transferSenderPaysFee(address sender, address to, uint value)
         internal
         returns (bool)
     {
@@ -233,7 +229,7 @@ contract FeeToken is ExternStateToken {
     /**
      * @notice Ability to transferFrom where they sender pays the fees (not ERC20).
      */
-    function _transferFromSenderPaysFee_byProxy(address sender, address from, address to, uint value)
+    function _transferFromSenderPaysFee(address sender, address from, address to, uint value)
         internal
         returns (bool)
     {
@@ -267,8 +263,8 @@ contract FeeToken is ExternStateToken {
         tokenState.setBalanceOf(address(this), safeSub(tokenState.balanceOf(address(this)), value));
         tokenState.setBalanceOf(account, safeAdd(tokenState.balanceOf(account), value));
 
-        emitFeesWithdrawn(account, value);
-        emitTransfer(address(this), account, value);
+        emit FeesWithdrawn(account, value);
+        emit Transfer(address(this), account, value);
 
         return true;
     }
@@ -278,20 +274,18 @@ contract FeeToken is ExternStateToken {
      */
     function donateToFeePool(uint n)
         external
-        optionalProxy
         returns (bool)
     {
-        address sender = messageSender;
         /* Empty donations are disallowed. */
-        uint balance = tokenState.balanceOf(sender);
+        uint balance = tokenState.balanceOf(msg.sender);
         require(balance != 0);
 
         /* safeSub ensures the donor has sufficient balance. */
-        tokenState.setBalanceOf(sender, safeSub(balance, n));
+        tokenState.setBalanceOf(msg.sender, safeSub(balance, n));
         tokenState.setBalanceOf(address(this), safeAdd(tokenState.balanceOf(address(this)), n));
 
-        emitFeesDonated(sender, n);
-        emitTransfer(sender, address(this), n);
+        emit FeesDonated(msg.sender, n);
+        emit Transfer(msg.sender, address(this), n);
 
         return true;
     }
@@ -309,26 +303,7 @@ contract FeeToken is ExternStateToken {
     /* ========== EVENTS ========== */
 
     event TransferFeeRateUpdated(uint newFeeRate);
-    bytes32 constant TRANSFERFEERATEUPDATED_SIG = keccak256("TransferFeeRateUpdated(uint256)");
-    function emitTransferFeeRateUpdated(uint newFeeRate) internal {
-        proxy._emit(abi.encode(newFeeRate), 1, TRANSFERFEERATEUPDATED_SIG, 0, 0, 0);
-    }
-
     event FeeAuthorityUpdated(address newFeeAuthority);
-    bytes32 constant FEEAUTHORITYUPDATED_SIG = keccak256("FeeAuthorityUpdated(address)");
-    function emitFeeAuthorityUpdated(address newFeeAuthority) internal {
-        proxy._emit(abi.encode(newFeeAuthority), 1, FEEAUTHORITYUPDATED_SIG, 0, 0, 0);
-    } 
-
     event FeesWithdrawn(address indexed account, uint value);
-    bytes32 constant FEESWITHDRAWN_SIG = keccak256("FeesWithdrawn(address,uint256)");
-    function emitFeesWithdrawn(address account, uint value) internal {
-        proxy._emit(abi.encode(value), 2, FEESWITHDRAWN_SIG, bytes32(account), 0, 0);
-    }
-
     event FeesDonated(address indexed donor, uint value);
-    bytes32 constant FEESDONATED_SIG = keccak256("FeesDonated(address,uint256)");
-    function emitFeesDonated(address donor, uint value) internal {
-        proxy._emit(abi.encode(value), 2, FEESDONATED_SIG, bytes32(donor), 0, 0);
-    }
 }

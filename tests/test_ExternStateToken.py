@@ -46,7 +46,7 @@ class TestExternStateToken(HavvenTestCase):
 
         token_contract, construction_txr = attempt_deploy(
             compiled, 'PublicEST', MASTER,
-            [proxy_contract.address, "Test Token", "TEST", 1000 * UNIT, tokenstate.address, MASTER]
+            ["Test Token", "TEST", 1000 * UNIT, tokenstate.address, MASTER]
         )
 
         token_abi = compiled['PublicEST']['abi']
@@ -82,7 +82,7 @@ class TestExternStateToken(HavvenTestCase):
                                        [MASTER, self.token_contract.address])
         token, _ = attempt_deploy(self.compiled, 'ExternStateToken',
                                   MASTER,
-                                  [self.proxy.address, "Test Token", "TEST",
+                                  ["Test Token", "TEST",
                                    1000 * UNIT,
                                    tokenstate.address, DUMMY])
         self.assertEqual(token.functions.tokenState().call(), tokenstate.address)

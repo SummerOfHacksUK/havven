@@ -40,7 +40,7 @@ class TestHavven(HavvenTestCase):
         print("Deployment initiated.\n")
 
         sources = ["tests/contracts/PublicHavven.sol", "contracts/Nomin.sol",
-                   "contracts/Court.sol", "contracts/HavvenEscrow.sol"]
+                   "contracts/Court.sol", "contracts/HavvenEscrow.sol", "contracts/Proxy.sol"]
 
         compiled, cls.event_maps = cls.compileAndMapEvents(sources)
 
@@ -49,14 +49,14 @@ class TestHavven(HavvenTestCase):
         nomin_proxy, _ = attempt_deploy(compiled, 'Proxy', MASTER, [MASTER])
         proxied_havven = W3.eth.contract(address=havven_proxy.address, abi=compiled['PublicHavven']['abi'])
         proxied_nomin = W3.eth.contract(address=nomin_proxy.address, abi=compiled['Nomin']['abi'])
-
+    
         tokenstate, _ = attempt_deploy(compiled, 'TokenState',
                                        MASTER, [MASTER, MASTER])
-        havven_contract, hvn_txr = attempt_deploy(compiled, 'PublicHavven', MASTER, [havven_proxy.address, tokenstate.address, MASTER, MASTER, UNIT//2])
+        havven_contract, hvn_txr = attempt_deploy(compiled, 'PublicHavven', MASTER, [tokenstate.address, MASTER, MASTER, UNIT//2])
         hvn_block = W3.eth.blockNumber
         nomin_contract, nom_txr = attempt_deploy(compiled, 'Nomin',
                                                  MASTER,
-                                                 [nomin_proxy.address, havven_contract.address, MASTER])
+                                                 [havven_contract.address, MASTER])
         court_contract, court_txr = attempt_deploy(compiled, 'Court',
                                                    MASTER,
                                                    [havven_contract.address, nomin_contract.address,

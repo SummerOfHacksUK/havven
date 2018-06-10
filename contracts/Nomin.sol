@@ -52,19 +52,19 @@ contract Nomin is FeeToken {
 
     // Nomin transfers incur a 15 bp fee by default.
     uint constant TRANSFER_FEE_RATE = 15 * UNIT / 10000;
-    string constant TOKEN_NAME = "USD Nomins";
+    string constant TOKEN_NAME = "Nomin USD";
     string constant TOKEN_SYMBOL = "nUSD";
 
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(address _proxy, Havven _havven, address _owner)
-        FeeToken(_proxy, TOKEN_NAME, TOKEN_SYMBOL, 0, // Zero nomins initially exist.
+    constructor(Havven _havven, address _owner)
+        FeeToken(TOKEN_NAME, TOKEN_SYMBOL, 0, // Zero nomins initially exist.
                  TRANSFER_FEE_RATE,
                  _havven, // The havven contract is the fee authority.
                  _owner)
         public
     {
-        require(_proxy != 0 && address(_havven) != 0 && _owner != 0);
+        require(address(_havven) != 0 && _owner != 0);
         // It should not be possible to transfer to the nomin contract itself.
         frozen[this] = true;
         havven = _havven;
@@ -74,21 +74,21 @@ contract Nomin is FeeToken {
 
     function setCourt(Court _court)
         external
-        optionalProxy_onlyOwner
+        onlyOwner
     {
         court = _court;
-        emitCourtUpdated(_court);
+        emit CourtUpdated(_court);
     }
 
     function setHavven(Havven _havven)
         external
-        optionalProxy_onlyOwner
+        onlyOwner
     {
         // havven should be set as the feeAuthority after calling this depending on
         // havven's internal logic
         havven = _havven;
         setFeeAuthority(_havven);
-        emitHavvenUpdated(_havven);
+        emit HavvenUpdated(_havven);
     }
 
 
@@ -101,40 +101,36 @@ contract Nomin is FeeToken {
      * and no new funds can be transferred to it.*/
     function transfer(address to, uint value)
         public
-        optionalProxy
         returns (bool)
     {
         require(!frozen[to]);
-        return _transfer_byProxy(messageSender, to, value);
+        return _transfer(msg.sender, to, value);
     }
 
     /* Override ERC20 transferFrom function in order to check
      * whether the recipient account is frozen. */
     function transferFrom(address from, address to, uint value)
         public
-        optionalProxy
         returns (bool)
     {
         require(!frozen[to]);
-        return _transferFrom_byProxy(messageSender, from, to, value);
+        return _transferFrom(msg.sender, from, to, value);
     }
 
     function transferSenderPaysFee(address to, uint value)
         public
-        optionalProxy
         returns (bool)
     {
         require(!frozen[to]);
-        return _transferSenderPaysFee_byProxy(messageSender, to, value);
+        return _transferSenderPaysFee(msg.sender, to, value);
     }
 
     function transferFromSenderPaysFee(address from, address to, uint value)
         public
-        optionalProxy
         returns (bool)
     {
         require(!frozen[to]);
-        return _transferFromSenderPaysFee_byProxy(messageSender, from, to, value);
+        return _transferFromSenderPaysFee(msg.sender, from, to, value);
     }
 
     /* If a confiscation court motion has passed and reached the confirmation
@@ -160,19 +156,19 @@ contract Nomin is FeeToken {
         tokenState.setBalanceOf(address(this), safeAdd(tokenState.balanceOf(address(this)), balance));
         tokenState.setBalanceOf(target, 0);
         frozen[target] = true;
-        emitAccountFrozen(target, balance);
-        emitTransfer(target, address(this), balance);
+        emit AccountFrozen(target, balance);
+        emit Transfer(target, address(this), balance);
     }
 
     /* The owner may allow a previously-frozen contract to once
      * again accept and transfer nomins. */
     function unfreezeAccount(address target)
         external
-        optionalProxy_onlyOwner
+        onlyOwner
     {
         require(frozen[target] && target != address(this));
         frozen[target] = false;
-        emitAccountUnfrozen(target);
+        emit AccountUnfrozen(target);
     }
 
     /* Allow havven to issue a certain number of
@@ -183,8 +179,8 @@ contract Nomin is FeeToken {
     {
         tokenState.setBalanceOf(account, safeAdd(tokenState.balanceOf(account), amount));
         totalSupply = safeAdd(totalSupply, amount);
-        emitTransfer(address(0), account, amount);
-        emitIssued(account, amount);
+        emit Transfer(address(0), account, amount);
+        emit Issued(account, amount);
     }
 
     /* Allow havven to burn a certain number of
@@ -195,8 +191,8 @@ contract Nomin is FeeToken {
     {
         tokenState.setBalanceOf(account, safeSub(tokenState.balanceOf(account), amount));
         totalSupply = safeSub(totalSupply, amount);
-        emitTransfer(account, address(0), amount);
-        emitBurned(account, amount);
+        emit Transfer(account, address(0), amount);
+        emit Burned(account, amount);
     }
 
     /* ========== MODIFIERS ========== */
@@ -214,38 +210,9 @@ contract Nomin is FeeToken {
     /* ========== EVENTS ========== */
 
     event CourtUpdated(address newCourt);
-    bytes32 constant COURTUPDATED_SIG = keccak256("CourtUpdated(address)");
-    function emitCourtUpdated(address newCourt) internal {
-        proxy._emit(abi.encode(newCourt), 1, COURTUPDATED_SIG, 0, 0, 0);
-    }
-
     event HavvenUpdated(address newHavven);
-    bytes32 constant HAVVENUPDATED_SIG = keccak256("HavvenUpdated(address)");
-    function emitHavvenUpdated(address newHavven) internal {
-        proxy._emit(abi.encode(newHavven), 1, HAVVENUPDATED_SIG, 0, 0, 0);
-    }
-
     event AccountFrozen(address indexed target, uint balance);
-    bytes32 constant ACCOUNTFROZEN_SIG = keccak256("AccountFrozen(address,uint256)");
-    function emitAccountFrozen(address target, uint balance) internal {
-        proxy._emit(abi.encode(balance), 2, ACCOUNTFROZEN_SIG, bytes32(target), 0, 0);
-    }
-
     event AccountUnfrozen(address indexed target);
-    bytes32 constant ACCOUNTUNFROZEN_SIG = keccak256("AccountUnfrozen(address)");
-    function emitAccountUnfrozen(address target) internal {
-        proxy._emit(abi.encode(), 2, ACCOUNTUNFROZEN_SIG, bytes32(target), 0, 0);
-    }
-
     event Issued(address indexed account, uint amount);
-    bytes32 constant ISSUED_SIG = keccak256("Issued(address,uint256)");
-    function emitIssued(address account, uint amount) internal {
-        proxy._emit(abi.encode(amount), 2, ISSUED_SIG, bytes32(account), 0, 0);
-    }
-
     event Burned(address indexed account, uint amount);
-    bytes32 constant BURNED_SIG = keccak256("Burned(address,uint256)");
-    function emitBurned(address account, uint amount) internal {
-        proxy._emit(abi.encode(amount), 2, BURNED_SIG, bytes32(account), 0, 0);
-    }
 }

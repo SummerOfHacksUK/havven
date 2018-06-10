@@ -15,8 +15,8 @@ contract PublicHavven is Havven {
     uint constant public MIN_FEE_PERIOD_DURATION = 1 days;
     uint constant public MAX_FEE_PERIOD_DURATION = 26 weeks;
 
-    constructor(address _proxy, TokenState _state, address _owner, address _oracle, uint _price)
-        Havven(_proxy, _state, _owner, _oracle, _price)
+    constructor(TokenState _state, address _owner, address _oracle, uint _price)
+        Havven(_state, _owner, _oracle, _price)
         public
     {}
 
@@ -30,7 +30,6 @@ contract PublicHavven is Havven {
      */
     function endow(address to, uint value)
         external
-        optionalProxy_onlyOwner
     {
         address sender = this;
         /* If they have enough available Havvens, it could be that
@@ -42,7 +41,7 @@ contract PublicHavven is Havven {
          * an exception will be thrown in this call. */
         tokenState.setBalanceOf(sender, safeSub(tokenState.balanceOf(sender), value));
         tokenState.setBalanceOf(to, safeAdd(tokenState.balanceOf(to), value));
-        emitTransfer(sender, to, value);
+        emit Transfer(sender, to, value);
     }
 
     function currentTime()
