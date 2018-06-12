@@ -107,6 +107,39 @@ contract ExternStateToken is SafeDecimalMath, SelfDestructible {
         emit TokenStateUpdated(_tokenState);
     }
 
+    /**
+    * @notice Set the ERC20 name of this token.
+    */
+    function setName(string _name)
+        external
+        onlyOwner 
+    {
+        name = _name;
+        emit NameUpdated(_name);
+    }
+
+    /**
+    * @notice Set the ERC20 symbol of this token.
+    */
+    function setSymbol(string _symbol)
+        external
+        onlyOwner 
+    {
+        symbol = _symbol;
+        emit SymbolUpdated(_name);
+    }
+
+    /**
+    * @notice Set the totalSupply of this token.
+    */
+    function setTotalSupply(string _totalSupply)
+        external
+        onlyOwner
+    {
+        totalSupply = _totalSupply;
+        emit TotalSupplyUpdated(_totalSupply)
+    }
+
     function _internalTransfer(address from, address to, uint value) 
         internal
         returns (bool)
