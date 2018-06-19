@@ -8,6 +8,21 @@ from unittest import TestSuite, TestLoader, TextTestRunner
 from utils.generalutils import load_test_settings, ganache_error_message
 
 if __name__ == '__main__':
+    # Compare current repo abis with new
+    subprocess.run(['solc --abi contracts/*.sol -o contracts/temp_abis'], shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    result = subprocess.run(['diff', '-r', 'contracts/abis', 'contracts/temp_abis'], stdout=subprocess.PIPE)
+    subprocess.run(['rm', '-rf', 'contracts/temp_abis'], stdout=subprocess.DEVNULL)
+
+    if len(result.stdout) > 0:
+        print("Abi haven't been updated, forcefully updating them now. If this error has occured on travis, please push a new commit with updated abis.")
+        subprocess.run(['solc --abi contracts/*.sol -o contracts/abis --overwrite'],
+                       shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        sys.exit(1)
+
+    ###
+    # Setup and run the test suite
+    ###
+
     num_agents = "150"
     eth_per_agent = "1000000000000"
 
